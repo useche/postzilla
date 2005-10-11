@@ -1,0 +1,20 @@
+Postzilla-0.1
+
+Program to make fast downloads from http and ftp servers.
+It uses threads and make multiples connections to the
+specified server.
+
+Requirements:
+- >=Python2.2
+
+usage:
+postzilla [-t <number of threads>] [-u <user>] [-p <password>] <url>
+
+Where:
+-t: number of connections that will be make it to the server. Default 8
+-u: login user, just in case that the server need authentication
+-p: password, just in case that the server need authentication
+url: Complete file's url to be downloaded
+
+Copyright 2005 Carlos Castillo and Luis Useche
+emails: {useche|carlos.d.castillo}@gmail.com

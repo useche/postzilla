@@ -1,0 +1,104 @@
+#!/usr/bin/python
+
+###################################################################################
+#                          postzilla.py  -  description
+#                             -------------------
+#    begin                : Apr 3, 2005
+#    last update          : Oct 3, 2005
+#    copyright            : (C) 2005 by Carlos Castillo and Luis Useche
+#    email                : {carlos.d.castillo|useche}@gmail.com
+#
+###################################################################################
+#     This file is part of Postzilla.
+#
+#     Postzilla is free software; you can redistribute it and/or modify
+#     it under the terms of the GNU General Public License as published by
+#     the Free Software Foundation; either version 2 of the License, or
+#     (at your option) any later version.
+#
+#     Foobar is distributed in the hope that it will be useful,
+#     but WITHOUT ANY WARRANTY; without even the implied warranty of
+#     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#     GNU General Public License for more details.
+#
+#     You should have received a copy of the GNU General Public License
+#     along with Foobar; if not, write to the Free Software
+#     Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
+###################################################################################
+
+from optparse import OptionParser
+
+from threading import Thread,currentThread
+
+from progressbar import ProgressBar
+from common import *
+
+import sys
+
+def main(option, url):
+    filesize = get_file_size(url, option.user, option.password)
+        
+    print "file size:",filesize, "bytes"
+
+    chunks = option.chunks
+    chunk = filesize / chunks
+
+    pos = 0
+    lpairs = []
+    for i in range(chunks):
+        if i==chunks-1:
+            lpairs.append((pos, pos+rem-1))
+        else:
+            lpairs.append((pos, pos+chunk-1))
+            pos = pos + chunk
+            rem = filesize - pos
+
+    #create the progress bar
+    progressbar = ProgressBar(lpairs)
+
+    DownloadPart = get_download_protocol(url)
+
+    threads = []
+    for i,(first,last) in enumerate(lpairs):
+        d = DownloadPart(url,first,last,i,progressbar,option.user,option.password)
+        threads.append(Thread(target=d.download))
+        threads[i].start()
+
+    for thread in threads:
+        thread.join()
+
+    #finalizing the progressbar
+    progressbar.finalize()
+    
+    bn = url.split('/')[-1]
+
+    print "Joining all the parts..."
+    join_files(bn,chunks)
+
+    print "Deleting temporal file..."
+    delete_temp_files(bn,chunks)
+
+#### Argument parsing #############################################################################
+if __name__ == '__main__':
+    parser = OptionParser(usage="%prog [-t <number of threads>] [-u <user>] [-p <password>] <url>",
+                          version="%prog 0.1")
+
+    #number of threads option
+    parser.add_option("-t", "--threads", dest="chunks",
+                      action="store", type="int", default=8,
+                      help="Number of threads or chunks to be divided the file")
+    #user(auth)
+    parser.add_option("-u", "--user", dest="user",
+                      action="store", type="string", default="",
+                      help="User to make the ftp/http authentication")
+    #password(auth)
+    parser.add_option("-p", "--password", dest="password",
+                      action="store", type="string", default="",
+                      help="Password to make the ftp/http authentication")
+    
+    (option, args) = parser.parse_args()
+
+    if len(args)!=1:
+        parser.error("You most supply a url")
+
+    main(option, args[0])

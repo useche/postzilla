@@ -1,0 +1,9 @@
+- Comment the source code a littel bit
+- Make some modules separating fuctions
+- Add the resume function to the download
+- Add a limited number of retries in each thread
+- Catch the C-c signal to kill the program
+- Add HTTPS suppor
+- Support for too many args (the same user, password and number of threads)
+- Make TODO's
+- Support for ssh protocol (pyssh or paramiko)
