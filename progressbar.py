@@ -4,8 +4,8 @@
 #                          progressbar.py  -  description
 #                             -------------------
 #    begin                : Sep 30, 2005
-#    last update          : Oot  3, 2005
-#    copyright            : (C) 2005 by Luis Useche
+#    last update          : Jul 14, 2007
+#    copyright            : (C) 2005, 2006, 2007 by Luis Useche
 #    email                : useche@gmail.com
 #
 ###################################################################################
@@ -150,10 +150,13 @@ class ProgressBar:
         self.speedometer = Timer(1,self.updateRate)
         self.speedometer.start()
 
-    def finalize(self):
-        self.downloaded = self.toDownload
-        self.updateBar()
-        print "" # printing the \n
+    def finalize(self, interrupted):
+        # if it was interrupted, we do not need to print the bar again
+        if(not interrupted):
+            self.downloaded = self.toDownload
+            self.updateBar()
+            print "" # printing the \n
+        
         self.speedometer.cancel()
 
 def humanize_rate(rate):

@@ -3,9 +3,9 @@
 ###################################################################################
 #                          postzilla.py  -  description
 #                             -------------------
-#    begin                : Apr 3, 2005
-#    last update          : Oct 3, 2005
-#    copyright            : (C) 2005 by Carlos Castillo and Luis Useche
+#    begin                : Apr  3, 2005
+#    last update          : Jul 14, 2007
+#    copyright            : (C) 2005, 2006, 2007 by Carlos Castillo and Luis Useche
 #    email                : {carlos.d.castillo|useche}@gmail.com
 #
 ###################################################################################
@@ -71,7 +71,7 @@ class HttpDownloadPart(DownloadPart):
     - get_request:  create a request and return it
     """
 
-    def __init__(self, url, firstbyte, lastbyte, order, progressbar, user, password):
+    def __init__(self, url, firstbyte, lastbyte, order, progressbar, user, password, filename):
         self.url = urlparse(url)
         self.firstbyte = firstbyte
         self.lastbyte = lastbyte
@@ -81,10 +81,12 @@ class HttpDownloadPart(DownloadPart):
         self.progressbar = progressbar
         self.user = user
         self.password = password
-        self.tmp_filename = common.get_tmp_filename(self.url[2].split('/')[-1],self.order)
+        self.filename = filename
+        self.stop = False
         
     def download(self):
-        f = open(self.tmp_filename,'wb')
+        f = open(self.filename,'wb')
+        f.seek(self.firstbyte)
 
         conn = HTTPConnection(self.url[1])
         conn.request('GET',self.url[2],headers=self.get_headers())
@@ -107,6 +109,9 @@ class HttpDownloadPart(DownloadPart):
             self.firstbyte += len(buf)
             self.toDownload -= len(buf)
 
+            # if the thread must stop, we finish
+            if(self.stop): return
+            
             #update the progressbar
             self.progressbar.update(self.order, len(buf))
             
@@ -144,8 +149,11 @@ class HttpDownloadPart(DownloadPart):
     
     get_file_size = classmethod(get_file_size)
 
+    def must_stop(self):
+        self.stop = True
+
 class FtpDownloadPart(DownloadPart):
-    def __init__(self, url, firstbyte, lastbyte, order, progressbar, user, password):
+    def __init__(self, url, firstbyte, lastbyte, order, progressbar, user, password,filename):
         self.url = urlparse(url)
         self.firstbyte = firstbyte
         self.lastbyte = lastbyte
@@ -155,10 +163,12 @@ class FtpDownloadPart(DownloadPart):
         self.progressbar = progressbar
         self.user = user
         self.password = password
-        self.tmp_filename = common.get_tmp_filename(self.url[2].split('/')[-1],self.order)
+        self.filename = filename
+        self.stop = False
 
     def download(self):
-        f = open(self.tmp_filename,'wb')
+        f = open(self.filename,'wb')
+        f.seek(self.firstbyte)
 
         ftp = FTP(self.url[1])
         
@@ -188,11 +198,15 @@ class FtpDownloadPart(DownloadPart):
 
             toRead = min(self.sizeToRead,self.toDownload)
             buf = sock.recv(toRead)
+
             f.write(buf)
             
             self.firstbyte += len(buf)
             self.toDownload -= len(buf)
         
+            # if the thread must stop, we finish
+            if(self.stop): return
+            
             self.progressbar.update(self.order, len(buf))
 
     def get_file_size(self,url,user,password):
@@ -217,3 +231,6 @@ class FtpDownloadPart(DownloadPart):
         return length
     
     get_file_size = classmethod(get_file_size)
+
+    def must_stop(self):
+        self.stop = True

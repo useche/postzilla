@@ -3,9 +3,9 @@
 ###################################################################################
 #                          postzilla.py  -  description
 #                             -------------------
-#    begin                : Apr 3, 2005
-#    last update          : Oct 3, 2005
-#    copyright            : (C) 2005 by Carlos Castillo and Luis Useche
+#    begin                : Apr  3, 2005
+#    last update          : Jul 14, 2007
+#    copyright            : (C) 2005, 2006, 2007 by Carlos Castillo and Luis Useche
 #    email                : {carlos.d.castillo|useche}@gmail.com
 #
 ###################################################################################
@@ -37,12 +37,29 @@ from common import *
 import signal, os
 import sys
 
+# Interrupted Exception
+class InterruptedException(Exception):
+    def __init__(self): pass
+
 def main(option, url):
+    #list of all the download instances
+    down_instances = []
+
+    #was interrupted by a Ctrl-C?
+    interrupted = False
+
+    #file name
+    tmp = option.output
+    if(tmp):
+        filename = tmp
+    else:
+        filename = url.split('/')[-1]
+        
     Protocol = get_download_protocol(url)
 
     filesize = Protocol.get_file_size(url, option.user, option.password)
         
-    print "file size:",filesize, "bytes"
+    print "file: ",filename," size:",filesize,"bytes"
 
     chunks = option.chunks
     chunk = filesize / chunks
@@ -63,8 +80,9 @@ def main(option, url):
 
     threads = []
     for i,(first,last) in enumerate(lpairs):
-        d = Protocol(url,first,last,i,progressbar,option.user,option.password)
-        threads.append(Thread(target=d.download))
+        d = Protocol(url,first,last,i,progressbar,option.user,option.password,filename)
+        down_instances.append(d)
+        threads.append(Thread(target=d.download,name="postzilla-"+str(i)))
         threads[i].start()
 
     # waiting for the threads to finish. We need to do all this work because
@@ -77,40 +95,50 @@ def main(option, url):
                 t.join(1000000.0)
             
             runningThreads = [t for t in threads if t.isAlive()]
+        except InterruptedException:
+            interrupted = True
+
+            # making the threads stop
+            for d in down_instances:
+                d.must_stop()
         except:
             pass
-        
+
     #finalizing the progressbar
-    progressbar.finalize()
-    
-    bn = url.split('/')[-1]
+    progressbar.finalize(interrupted)
 
-    print "Joining all the parts..."
-    join_files(bn,chunks)
-
-    print "Deleting temporal file..."
-    delete_temp_files(bn,chunks)
+    if(interrupted):
+        print "Deleting temporal file..."
+        os.remove(filename)
 
 def stop_download(signum, frame):
-    print "Signal"
+    print "\nDownload finishing..."
+                
+    raise InterruptedException
 
 #### Argument parsing #############################################################################
 if __name__ == '__main__':
-    parser = OptionParser(usage="%prog [-t <number of threads>] [-u <user>] [-p <password>] <url>",
+    parser = OptionParser(usage="%prog [-t <number of threads>] [-o <output file>] [-u <user>] [-p <password>] <url>",
                           version="%prog 0.1")
 
     #number of threads option
     parser.add_option("-t", "--threads", dest="chunks",
                       action="store", type="int", default=8,
-                      help="Number of threads or chunks to be divided the file")
+                      help="number of threads to be used in the download")
+
+    #output file
+    parser.add_option("-o", "--output", dest="output",
+                      action="store", type="string", default="",
+                      help="output file where the downloaded data will be placed")
+
     #user(auth)
     parser.add_option("-u", "--user", dest="user",
                       action="store", type="string", default="",
-                      help="User to make the ftp/http authentication")
+                      help="user to make the ftp/http authentication")
     #password(auth)
     parser.add_option("-p", "--password", dest="password",
                       action="store", type="string", default="",
-                      help="Password to make the ftp/http authentication")
+                      help="password to make the ftp/http authentication")
     
     (option, args) = parser.parse_args()
 

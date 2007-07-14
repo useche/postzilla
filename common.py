@@ -4,8 +4,8 @@
 #                          progressbar.py  -  description
 #                             -------------------
 #    begin                : Oct  4, 2005
-#    last update          : Oct  4, 2005
-#    copyright            : (C) 2005 by Luis Useche
+#    last update          : Jul 14, 2007
+#    copyright            : (C) 2005, 2006, 2007 by Luis Useche
 #    email                : useche@gmail.com
 #
 ###################################################################################
@@ -38,26 +38,12 @@ import string, base64
 
 from download import HttpDownloadPart, FtpDownloadPart
 
-def join_files(file,chunks):
-    complete_file = open(file,"w")
-    for f in [get_tmp_filename(file,i) for i in range(chunks)]:
-        partial_file = open(f,"r")
-        complete_file.write(partial_file.read())
-        partial_file.close()
-    complete_file.close()
-
-def delete_temp_files(file,chunks):
-    map(lambda f: os.remove(f),[get_tmp_filename(file,i) for i in range(chunks)])
-
 def get_download_protocol(url):
     parsedURL = urlparse(url)
     if parsedURL[0] == 'http':
         return HttpDownloadPart
     else:
         return FtpDownloadPart
-
-def get_tmp_filename(orig_filename,index):
-    return ".%s.%d"%(orig_filename,index)
 
 def verify_http_response(res):
     if res.status!=200 and res.status!=206:
