@@ -28,21 +28,26 @@
 
 from optparse import OptionParser
 
-from threading import Thread,currentThread
+from threading import Thread
+import threading
 
 from progressbar import ProgressBar
 from common import *
 
+import signal, os
 import sys
 
 def main(option, url):
-    filesize = get_file_size(url, option.user, option.password)
+    Protocol = get_download_protocol(url)
+
+    filesize = Protocol.get_file_size(url, option.user, option.password)
         
     print "file size:",filesize, "bytes"
 
     chunks = option.chunks
     chunk = filesize / chunks
 
+    # create the pair (position, # bytes to download)
     pos = 0
     lpairs = []
     for i in range(chunks):
@@ -56,17 +61,25 @@ def main(option, url):
     #create the progress bar
     progressbar = ProgressBar(lpairs)
 
-    DownloadPart = get_download_protocol(url)
-
     threads = []
     for i,(first,last) in enumerate(lpairs):
-        d = DownloadPart(url,first,last,i,progressbar,option.user,option.password)
+        d = Protocol(url,first,last,i,progressbar,option.user,option.password)
         threads.append(Thread(target=d.download))
         threads[i].start()
 
-    for thread in threads:
-        thread.join()
-
+    # waiting for the threads to finish. We need to do all this work because
+    # of the Python Bug #1167930 where the join is not interruptible by a
+    # [Ctrl-c] signal. The more seconds, the better.
+    runningThreads = threads
+    while len(runningThreads) > 0:
+        try:
+            for t in threads:
+                t.join(1000000.0)
+            
+            runningThreads = [t for t in threads if t.isAlive()]
+        except:
+            pass
+        
     #finalizing the progressbar
     progressbar.finalize()
     
@@ -77,6 +90,9 @@ def main(option, url):
 
     print "Deleting temporal file..."
     delete_temp_files(bn,chunks)
+
+def stop_download(signum, frame):
+    print "Signal"
 
 #### Argument parsing #############################################################################
 if __name__ == '__main__':
@@ -101,4 +117,7 @@ if __name__ == '__main__':
     if len(args)!=1:
         parser.error("You most supply a url")
 
+    # setting the signal handler
+    signal.signal(signal.SIGINT, stop_download)
+        
     main(option, args[0])

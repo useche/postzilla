@@ -127,10 +127,7 @@ class ProgressBar:
 
         self.bar += self.rate
 
-        if self.downloaded==self.toDownload:
-            self.bar += "\n"
-        else:
-            self.bar += "\r"
+        self.bar += "\r"
 
         #print it only if change
         if not self.oldbar == self.bar:
@@ -156,6 +153,7 @@ class ProgressBar:
     def finalize(self):
         self.downloaded = self.toDownload
         self.updateBar()
+        print "" # printing the \n
         self.speedometer.cancel()
 
 def humanize_rate(rate):

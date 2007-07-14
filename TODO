@@ -7,3 +7,4 @@
 - Support for too many args (the same user, password and number of threads)
 - Make TODO's
 - Support for ssh protocol (pyssh or paramiko)
+- Support resume of the downloads

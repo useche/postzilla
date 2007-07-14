@@ -81,29 +81,25 @@ class HttpDownloadPart(DownloadPart):
         self.progressbar = progressbar
         self.user = user
         self.password = password
-
+        self.tmp_filename = common.get_tmp_filename(self.url[2].split('/')[-1],self.order)
+        
     def download(self):
-        f = open(self.url[2].split('/')[-1]+'.'+str(self.order),'wb')
+        f = open(self.tmp_filename,'wb')
 
-        while True:
-            conn = HTTPConnection(self.url[1])
-            conn.request('GET',self.url[2],headers=self.get_headers())
-            response = conn.getresponse()
+        conn = HTTPConnection(self.url[1])
+        conn.request('GET',self.url[2],headers=self.get_headers())
+        response = conn.getresponse()
 
-            #verifying that response is ok
-            common.verify_http_response(response)
+        #verifying that response is ok
+        common.verify_http_response(response)
 
-            if(self.write_bytes(response,f)): break
-
-            conn.close()
-
-
+        self.write_bytes(response,f)
+        
         conn.close()
         f.close()
 
     def write_bytes(self,hte,f):
         while (self.toDownload):
-
             toRead = min(self.sizeToRead,self.toDownload)
             buf = hte.read(toRead)
 
@@ -114,19 +110,39 @@ class HttpDownloadPart(DownloadPart):
             #update the progressbar
             self.progressbar.update(self.order, len(buf))
             
-            #when it cant read the complete buffer, it fails
-            if len(buf)!=toRead: return False
-
-        return True
-    
     def get_headers(self):
         extra_headers = {'User-agent':'Mozilla/5.0', 'Range': 'bytes=%d-%d'%(self.firstbyte, self.lastbyte)}
 
         #if i got user and password i login
         if self.user and self.password:
-            extra_headers['Authorization'] = 'Basic %s'%string.strip(base64.encodestring(self.user + ':' + self.password))
+            enc_pass = 'Basic %s'%string.strip(base64.encodestring(self.user + ':' + self.password))
+            extra_headers['Authorization'] = enc_pass
 
         return extra_headers
+
+    def get_file_size(self,url,user,password):
+        parsedURL = urlparse(url)
+        conn = HTTPConnection(parsedURL[1])
+        
+        #authentication
+        extra_headers = {}
+        if user and password:
+            enc_pass = 'Basic %s'%string.strip(base64.encodestring(user + ':' + password))
+            extra_headers = {'Authorization': enc_pass}
+        
+        conn.request('GET',parsedURL[2],headers=extra_headers)
+        r = conn.getresponse()
+
+        #verify that the request go well
+        common.verify_http_response(r)
+
+        length = r.length
+        
+        conn.close()
+
+        return length
+    
+    get_file_size = classmethod(get_file_size)
 
 class FtpDownloadPart(DownloadPart):
     def __init__(self, url, firstbyte, lastbyte, order, progressbar, user, password):
@@ -139,36 +155,35 @@ class FtpDownloadPart(DownloadPart):
         self.progressbar = progressbar
         self.user = user
         self.password = password
+        self.tmp_filename = common.get_tmp_filename(self.url[2].split('/')[-1],self.order)
 
     def download(self):
-        f = open(self.url[2].split('/')[-1]+'.'+str(self.order),'wb')
+        f = open(self.tmp_filename,'wb')
 
-        while True:
-            ftp = FTP(self.url[1])
+        ftp = FTP(self.url[1])
+        
+        #if i got user and password i login in
+        if self.user and self.password:
+            response = ftp.login(self.user,self.password)
+        else:
+            response = ftp.login()
             
-            #if i got user and password i login in
-            if self.user and self.password:
-                response = ftp.login(self.user,self.password)
-            else:
-                response = ftp.login()
-
-            #verifying that the login is ok
-            common.verify_ftp_response(response)
+        #verifying that the login is ok
+        common.verify_ftp_response(response)
         
-            #begin from the firstbyte
-            ftp.sendcmd("SYST")
-            ftp.sendcmd("TYPE I")
-            ftp.sendcmd("PASV")
+        #begin from the firstbyte
+        ftp.sendcmd("SYST")
+        ftp.sendcmd("TYPE I")
+        ftp.sendcmd("PASV")
         
-            sock = ftp.transfercmd(("RETR %s"%(self.url[2])),self.firstbyte)
+        sock = ftp.transfercmd(("RETR %s"%(self.url[2])),self.firstbyte)
 
-            if self.write_bytes(sock,f): break
-
-            sock.close()
-
+        self.write_bytes(sock,f)
+        
         sock.close()
 
     def write_bytes(self,sock,f):
+
         while self.toDownload:
 
             toRead = min(self.sizeToRead,self.toDownload)
@@ -180,6 +195,25 @@ class FtpDownloadPart(DownloadPart):
         
             self.progressbar.update(self.order, len(buf))
 
-            if len(buf)!=toRead: return False
-
-        return True
+    def get_file_size(self,url,user,password):
+        parsedURL = urlparse(url)
+        print "Connecting to %s..."%(parsedURL[1])
+        ftp = FTP(parsedURL[1])
+        
+        print "Login..."
+        #authentication stuff
+        if user and password:
+            response = ftp.login(user,password)
+        else:
+            response = ftp.login()
+            
+        #verify that the login was right
+        common.verify_ftp_response(response)
+        
+        length = ftp.size(parsedURL[2])
+        
+        ftp.quit()
+        
+        return length
+    
+    get_file_size = classmethod(get_file_size)

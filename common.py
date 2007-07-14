@@ -40,59 +40,14 @@ from download import HttpDownloadPart, FtpDownloadPart
 
 def join_files(file,chunks):
     complete_file = open(file,"w")
-    for f in ["%s.%d"%(file,i) for i in range(chunks)]:
+    for f in [get_tmp_filename(file,i) for i in range(chunks)]:
         partial_file = open(f,"r")
         complete_file.write(partial_file.read())
         partial_file.close()
     complete_file.close()
 
 def delete_temp_files(file,chunks):
-    map(lambda f: os.remove(f),["%s.%d"%(file,i) for i in range(chunks)])
-
-def get_file_size(url, user, password):
-    parsedURL = urlparse(url)
-
-    if parsedURL[0] == 'http':
-        conn = HTTPConnection(parsedURL[1])
-
-        #authentication
-        extra_headers = {}
-        if user and password:
-            extra_headers = {'Authorization': 'Basic %s'%string.strip(base64.encodestring(user + ':' + password))}
-        
-        conn.request('GET',parsedURL[2],headers=extra_headers)
-        r = conn.getresponse()
-
-        #verify that the request go well
-        verify_http_response(r)
-
-        length = r.length
-        
-        conn.close()
-
-    elif parsedURL[0] == 'ftp':
-
-        print "Connecting to %s..."%(parsedURL[1])
-        ftp = FTP(parsedURL[1])
-
-        print "Login..."
-        #authentication stuff
-        if user and password:
-            response = ftp.login(user,password)
-        else:
-            response = ftp.login()
-
-        #verify that the login was right
-        verify_ftp_response(response)
-
-        length = ftp.size(parsedURL[2])
-
-        ftp.quit()
-
-    else:
-        error_exit('We only support ftp and http protocols')
-
-    return length
+    map(lambda f: os.remove(f),[get_tmp_filename(file,i) for i in range(chunks)])
 
 def get_download_protocol(url):
     parsedURL = urlparse(url)
@@ -100,6 +55,9 @@ def get_download_protocol(url):
         return HttpDownloadPart
     else:
         return FtpDownloadPart
+
+def get_tmp_filename(orig_filename,index):
+    return ".%s.%d"%(orig_filename,index)
 
 def verify_http_response(res):
     if res.status!=200 and res.status!=206:
